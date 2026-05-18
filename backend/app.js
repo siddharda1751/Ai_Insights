@@ -17,10 +17,12 @@ const app = express();
 
 // Configure CORS with frontend URL
 const corsOptions = {
-    origin: process.env.FRONTEND_URL,
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true,
     optionsSuccessStatus: 200,
 };
+
+console.log(`[CORS] Allowing origin: ${corsOptions.origin}`);
 
 app.use(cors(corsOptions));
 app.use(express.json());
