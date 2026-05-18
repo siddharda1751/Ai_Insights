@@ -1,5 +1,20 @@
 import { google } from 'googleapis';
-import credentials from '../config/google-service-account.json' with { type: 'json' };
+let credentials;
+
+// 1. Check if the JSON is provided as an environment variable (Production)
+if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+        credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+    } catch (error) {
+        console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON env variable:", error);
+    }
+} else {
+    // 2. Fallback to your local file if the env variable isn't set (Local Development)
+    const { default: localCreds } = await import('../config/google-service-account.json', {
+        with: { type: 'json' }
+    });
+    credentials = localCreds;
+}
 
 const auth = new google.auth.GoogleAuth({
     credentials,
