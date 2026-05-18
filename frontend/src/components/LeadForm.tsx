@@ -21,7 +21,7 @@ const labelStyle: React.CSSProperties = {
   color: '#94a3b8',
   marginBottom: 8,
 }
-const BACKEND_URL = import.meta.env.BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 export default function LeadForm({ onSuccess }: { onSuccess: (leadId: string) => void }) {
   const [formData, setFormData] = useState({
@@ -41,6 +41,7 @@ export default function LeadForm({ onSuccess }: { onSuccess: (leadId: string) =>
     setLoading(true)
     setError('')
     try {
+      console.log(BACKEND_URL)
       const response = await axios.post(`${BACKEND_URL}/api/leads`, formData)
       onSuccess(response.data.leadId)
     } catch (err: any) {
