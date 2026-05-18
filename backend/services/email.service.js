@@ -22,16 +22,8 @@ let transporter;
 
 /**
  * Creates and verifies Gmail OAuth2 transporter on app startup.
- * Called once in app.js to ensure email is ready before accepting requests.
- * 
- * ✅ OAuth2 Setup Guide:
- * 1. Go to: https://console.developers.google.com/
- * 2. Create OAuth2 credentials (Desktop app / Other)
- * 3. Use Google OAuth2 Playground to get refresh token:
- *    https://developers.google.com/oauthplayground
- *    - Scope: https://www.googleapis.com/auth/gmail.send
- *    - Get authorization code → Exchange for refresh token
- * 4. Store refresh token securely in .env
+ * Non-blocking: if initialization fails, app continues running.
+ * Email will fail gracefully when actually needed.
  */
 export const initializeEmailService = async () => {
     try {
@@ -42,10 +34,8 @@ export const initializeEmailService = async () => {
 
         // Validate all required OAuth2 credentials
         if (!emailUser || !clientId || !clientSecret || !refreshToken) {
-            throw new Error(
-                'Missing Gmail OAuth2 credentials. Required env vars: ' +
-                'EMAIL_USER, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_REFRESH_TOKEN'
-            );
+            console.warn('[Email] Missing Gmail OAuth2 credentials — email delivery will fail');
+            return;
         }
 
         // Create transporter with OAuth2
@@ -65,8 +55,10 @@ export const initializeEmailService = async () => {
         await transporter.verify();
         console.log('[Email] Gmail OAuth2 transporter verified and ready');
     } catch (error) {
-        console.error('[Email] Failed to initialize Gmail OAuth2 transporter:', error.message);
-        throw error; // Don't continue if email setup fails
+        console.warn('[Email] Gmail OAuth2 initialization failed:', error.message);
+        console.warn('[Email] Email service will be unavailable — app will continue running');
+        // Don't throw — let app continue even if email fails
+        transporter = null;
     }
 };
 
