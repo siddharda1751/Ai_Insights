@@ -614,46 +614,6 @@ export const scrapeCompany = async (websiteUrl) => {
         return result;
     } catch (error) {
         console.error(`[Intelligence] Fatal error: ${error.message}`);
-        return {
-            company: {
-                name: 'N/A',
-                website: baseUrl,
-                title: 'N/A',
-                description: 'N/A',
-                industry: 'N/A',
-                businessType: 'N/A',
-                targetAudience: [],
-            },
-            branding: {
-                heroText: [],
-                taglines: [],
-                ctas: [],
-            },
-            offerings: {
-                services: [],
-                products: [],
-                features: [],
-                industriesServed: [],
-            },
-            businessSignals: {},
-            techStackSignals: {},
-            contentInsights: {
-                headings: [],
-                keyParagraphs: [],
-                testimonials: [],
-                faq: [],
-                blogTopics: [],
-            },
-            contact: {
-                emails: [],
-                phones: [],
-                addresses: [],
-                socialLinks: [],
-            },
-            automationOpportunities: [],
-            pagesVisited,
-            scrapedAt: new Date().toISOString(),
-            error: error.message,
-        };
+        throw error;
     }
 };

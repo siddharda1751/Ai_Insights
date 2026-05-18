@@ -28,8 +28,8 @@ export const appendLeadRow = async (lead) => {
                 lead.companyName,
                 lead.companyWebsite,
                 lead.industry,
-                lead.status,
                 lead.createdAt,
+                lead.status,
                 '',
                 ''
             ]]
@@ -41,7 +41,7 @@ export const appendLeadRow = async (lead) => {
 
     // Extract row number
     const rowNumber =
-        updatedRange.match(/\d+/)[0];
+         updatedRange.match(/![A-Z]+(\d+)/)[1];
 
 
     console.log('[Sheets] Lead row appended');
@@ -51,22 +51,19 @@ export const appendLeadRow = async (lead) => {
 export const updateLeadSheetStatus = async (
     rowNumber,
     status,
-    reportLink = '',
     error = ''
 ) => {
 
     await sheets.spreadsheets.values.update({
         spreadsheetId: process.env.GOOGLE_SHEET_ID,
 
-        range: `Sheet1!G${rowNumber}:J${rowNumber}`,
+        range: `Sheet1!H${rowNumber}:I${rowNumber}`,
 
         valueInputOption: 'USER_ENTERED',
 
         requestBody: {
             values: [[
                 status,
-                new Date().toISOString(),
-                reportLink,
                 error
             ]]
         }

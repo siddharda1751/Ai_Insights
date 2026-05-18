@@ -5,7 +5,6 @@ import { generatePDF } from './pdf.service.js';
 import { sendReportEmail, sendFailureEmail } from './email.service.js';
 import { retry, RETRY_CONFIGS } from '../utils/retry.util.js';
 import { updateLeadSheetStatus } from './googleSheets.service.js';
-import { uploadPDFToDrive } from './googleDrive.service.js';
 
 /**
  * Orchestrates the full lead enrichment workflow with retry logic.
@@ -44,6 +43,7 @@ export const generateLeadWorkflow = async (leadId, sheetRowNumber) => {
         // ── Step 3: Generate AI insights (with retry) ───────────────────────
         await updateLeadSheetStatus(sheetRowNumber, 'Generating AI insights');
         console.log('[Workflow] Step 2/4 — Generating AI insights...');
+
         const insights = await retry(
             () => generateInsights(lead.toObject(), scrapeData),
             {
@@ -51,29 +51,29 @@ export const generateLeadWorkflow = async (leadId, sheetRowNumber) => {
                 operation: `AI insights for ${lead.companyName}`,
             }
         );
+
         console.log('[AI] ✓ Insights generated');
 
         // ── Step 4: Generate PDF buffer in-memory (no retries) ──────────────
         await updateLeadSheetStatus(sheetRowNumber, 'Generating PDF');
         console.log('[Workflow] Step 3/4 — Generating PDF report...');
+
         const pdfBuffer = await generatePDF(lead.toObject(), insights);
+
         console.log(`[PDF] ✓ Generated (${pdfBuffer.length} bytes)`);
-        await updateLeadSheetStatus(sheetRowNumber,'Uploading PDF to Drive');
-
-        const driveLink = await uploadPDFToDrive( pdfBuffer,`${lead.companyName}_audit.pdf`);
-
-        console.log('[Drive] ✓ Uploaded');
-
+      
         // ── Step 5: Send email with PDF attachment (with retry) ────────────
-        await updateLeadSheetStatus(sheetRowNumber, 'Sending email',driveLink);
+        await updateLeadSheetStatus(sheetRowNumber, 'Sending email');
         console.log('[Workflow] Step 4/4 — Sending report email...');
+
         await retry(
             () => sendReportEmail(lead.toObject(), pdfBuffer),
-            {
+            { 
                 ...RETRY_CONFIGS.email,
                 operation: `Email to ${lead.email}`,
             }
         );
+
         console.log('[Email] ✓ Sent');
 
         // ── Step 6: Mark as completed ───────────────────────────────────────
@@ -86,7 +86,7 @@ export const generateLeadWorkflow = async (leadId, sheetRowNumber) => {
 
     } catch (error) {
         // ── Workflow failed after retries ───────────────────────────────────
-        await updateLeadSheetStatus(sheetRowNumber, 'Failed', '', error.message);
+        await updateLeadSheetStatus(sheetRowNumber, 'Failed', error.message);
         console.error(`[Workflow] ✗ Failed for leadId ${leadId}:`, error.message);
 
         if (!lead) {

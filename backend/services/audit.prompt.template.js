@@ -330,32 +330,3 @@ const truncate = (str, n) => {
     return str.length > n ? str.slice(0, n - 1) + '…' : str;
 };
 
-// ─── Fallback Audit (used when AI call fails) ─────────────────────────────────
-
-/**
- * Returns a minimal but structurally valid audit object.
- * The PDF system will render whatever is populated and skip empty sections.
- */
-export const buildFallbackAudit = (leadData, scrapeData) => {
-    const name = leadData?.companyName || 'your company';
-    const industry = leadData?.industry || 'your industry';
-
-    return {
-        executiveSummary: `${name} presents an opportunity to leverage AI automation for operational efficiency and competitive differentiation within the ${industry} sector. A full analysis will follow upon data enrichment.`,
-        companyPositioning: '',
-        digitalPresenceAnalysis: { strengths: [], weaknesses: [], brandObservations: [] },
-        operationalObservations: [],
-        customerExperienceInsights: [],
-        aiAutomationOpportunities: [],
-        strategicRecommendations: [],
-        industryTrends: [],
-        competitiveAnalysis: '',
-        automationReadinessScore: {
-            score: 0,
-            reasoning: 'Assessment requires additional company data.',
-        },
-        quickWins: [],
-        longTermOpportunities: [],
-        personalizedClosingInsight: `We look forward to exploring how AI automation can accelerate ${name}'s growth. Let's connect to discuss the opportunities identified above.`,
-    };
-};

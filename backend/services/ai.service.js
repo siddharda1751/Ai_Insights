@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { buildAuditPrompt, buildFallbackAudit } from './audit.prompt.template.js';
+import { buildAuditPrompt } from './audit.prompt.template.js';
 
 /**
  * Generates structured business audit insights using Gemini Flash (free tier).
@@ -46,11 +46,8 @@ export const generateInsights = async (leadData, scrapeData) => {
         console.log(audit);
         return audit;
     } catch (error) {
-        console.warn(`[AI] ✗ Gemini generation failed: ${error.message}`);
-        console.log(`[AI] Falling back to template-based default audit...`);
-
-        // Return fallback audit structure from template
-        return buildFallbackAudit(leadData, scrapeData);
+        console.error(`[AI] ✗ Gemini generation failed: ${error.message}`);
+        throw error;
     }
 };
 

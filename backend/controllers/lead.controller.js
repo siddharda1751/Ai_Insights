@@ -25,27 +25,21 @@ export const createLead = async (req, res) => {
                 errors: error.details.map((e) => e.message),
             });
         }
-
         // ── 2. Persist lead with initial status ──────────────────────────────
         const lead = await Lead.create({ ...value, status: 'processing' });
         const leadSheenInfo = formatLeadSheetInfo(lead);
         const sheetRowNumber = await appendLeadRow(leadSheenInfo);
-
-
-        // ── 3. Respond immediately — do NOT await workflow ───────────────────
-        res.status(200).json({
-            success: true,
-            message: 'Submission received. Report is being generated.',
-            leadId: lead._id
-        });
-
-        // ── 4. Fire-and-forget workflow (runs after response is sent) ────────
-        generateLeadWorkflow(lead._id, sheetRowNumber).catch((err) =>
-            console.error('[Controller] Unhandled workflow error:', err.message)
-        );
+            generateLeadWorkflow(lead._id, sheetRowNumber).catch((err) =>
+                console.error('[Controller] Unhandled workflow error:', err.message)
+            );
+            res.status(200).json({
+                success: true,
+                message: 'Submission received. Report is being generated.',
+                leadId: lead._id
+            });
 
     } catch (error) {
-        console.error('[createLead] Error:', error.message);
+        console.error('[createLead] Error:', error);
         if (!res.headersSent) {
             res.status(500).json({ success: false, message: 'Internal server error' });
         }
