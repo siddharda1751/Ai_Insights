@@ -48,7 +48,7 @@ When a lead submits their company information, the system automatically:
 
 ## Automated PDF Audit Generation
 
-- Dynamic PDF generation
+- Template-driven PDF rendering
 - Structured audit sections
 - Executive summary
 - Recommendations
