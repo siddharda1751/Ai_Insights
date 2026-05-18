@@ -32,4 +32,4 @@ app.use('/api/leads', leadRoutes);
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`[Server] Running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`[Server] Running on port ${PORT}`));
