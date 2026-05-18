@@ -10,10 +10,15 @@ if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
     }
 } else {
     // 2. Fallback to your local file if the env variable isn't set (Local Development)
-    const { default: localCreds } = await import('../config/google-service-account.json', {
-        with: { type: 'json' }
-    });
-    credentials = localCreds;
+    try {
+        const { default: localCreds } = await import('../config/google-service-account.json', {
+            with: { type: 'json' }
+        });
+        credentials = localCreds;
+    } catch (error) {
+        console.error("Failed to load local google-service-account.json:", error);
+        throw error;
+    }
 }
 
 const auth = new google.auth.GoogleAuth({
