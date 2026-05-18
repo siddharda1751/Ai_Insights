@@ -6,7 +6,7 @@ Built as an end-to-end asynchronous automation pipeline focused on operational r
 
 ---
 
-# Problem Statement
+# Project Overview
 
 Many businesses manually:
 
@@ -129,3 +129,40 @@ PDF audit generation
 Email delivery
         ↓
 Workflow marked completed
+```
+
+## Project Structure
+
+```bash
+backend/
+├── controllers/
+├── services/
+├── models/
+├── routes/
+├── utils/
+├── config/
+└── app.js
+```
+
+# Installation
+
+## Backend
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+# Known Limitations
+
+- SMTP-based email delivery works correctly in local execution but faced deployment restrictions on Render due to outbound SMTP networking limitations.
+- Google Drive persistence was explored but removed because Google Service Accounts do not provide normal Drive storage quota without OAuth delegation or Shared Drives.
