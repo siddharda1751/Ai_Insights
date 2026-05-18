@@ -43,7 +43,7 @@ export const generateInsights = async (leadData, scrapeData) => {
 
         console.log(`[AI] ✓ Audit generated successfully for ${leadData.companyName}`);
         console.log(`[AI] Audit keys: ${Object.keys(audit).join(', ')}`);
-        console.log(audit);
+
         return audit;
     } catch (error) {
         console.error(`[AI] ✗ Gemini generation failed: ${error.message}`);
