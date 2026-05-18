@@ -1,2 +1,3 @@
 backend/.env
 backend/config/google-service-account.json
+frontend/.env
