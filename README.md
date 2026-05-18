@@ -56,7 +56,7 @@ When a lead submits their company information, the system automatically:
 
 ## Email Automation
 
-- API-based email delivery using Resend
+- email delivery using nodemailer
 - PDF attachments
 - Failure notification emails
 - Stateless in-memory attachment handling
@@ -100,16 +100,10 @@ When a lead submits their company information, the system automatically:
 ## Integrations
 
 - Google Sheets API
-- Resend Email API
 
 ## PDF Generation
 
 - PDFKit
-
-## Deployment
-
-- Render
-- Vercel
 
 ---
 
