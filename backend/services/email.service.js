@@ -2,60 +2,52 @@ import nodemailer from 'nodemailer';
 import { buildEmailHTML, buildFailureEmailHTML } from '../utils/buildHtml.js';
 
 /**
- * EMAIL SERVICE — Nodemailer with Gmail OAuth2
+ * EMAIL SERVICE — Nodemailer with Gmail SMTP
  * 
- * ✅ Why Gmail OAuth2 over Resend/SMTP on Render free tier:
- * - OAuth2 is more secure than storing app passwords
- * - Gmail API doesn't require traditional SMTP port 587
- * - Works reliably on Render's free tier with port restrictions
- * - Avoids domain verification issues with third-party email services
- * - No persistent SMTP connections — API-based approach
- * 
- * ✅ Architecture:
+ * ✅ Simple & Reliable:
+ * - Uses Gmail SMTP with app password or account password
+ * - No OAuth2 complexity — just username and password
+ * - Works reliably on Render and other cloud platforms
  * - Single transporter instance (created once on app startup)
  * - In-memory PDF buffers (no file I/O)
- * - OAuth2 refresh tokens automatically refresh access tokens
- * - Error handling: throw upward for workflow retry logic
+ * 
+ * ✅ Setup:
+ * - EMAIL_USER: your Gmail address (e.g., user@gmail.com)
+ * - EMAIL_PASS: Gmail app password (16 chars) or account password
+ *   (If 2FA enabled, MUST use app password, not account password)
  */
 
 let transporter;
 
 /**
- * Creates and verifies Gmail OAuth2 transporter on app startup.
+ * Creates and verifies Gmail SMTP transporter on app startup.
  * Non-blocking: if initialization fails, app continues running.
- * Email will fail gracefully when actually needed.
  */
 export const initializeEmailService = async () => {
     try {
         const emailUser = process.env.EMAIL_USER;
-        const clientId = process.env.OAUTH_CLIENT_ID;
-        const clientSecret = process.env.OAUTH_CLIENT_SECRET;
-        const refreshToken = process.env.OAUTH_REFRESH_TOKEN;
+        const emailPass = process.env.EMAIL_PASS;
 
-        // Validate all required OAuth2 credentials
-        if (!emailUser || !clientId || !clientSecret || !refreshToken) {
-            console.warn('[Email] Missing Gmail OAuth2 credentials — email delivery will fail');
+        // Validate credentials
+        if (!emailUser || !emailPass) {
+            console.warn('[Email] Missing EMAIL_USER or EMAIL_PASS — email delivery will fail');
             return;
         }
 
-        // Create transporter with OAuth2
+        // Create transporter with Gmail SMTP
         transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
-                type: 'OAuth2',
                 user: emailUser,
-                clientId,
-                clientSecret,
-                refreshToken,
-                accessType: 'offline',
+                pass: emailPass,
             },
         });
 
         // Verify connection once on startup
         await transporter.verify();
-        console.log('[Email] Gmail OAuth2 transporter verified and ready');
+        console.log('[Email] SMTP transporter verified and ready');
     } catch (error) {
-        console.warn('[Email] Gmail OAuth2 initialization failed:', error.message);
+        console.warn('[Email] SMTP initialization failed:', error.message);
         console.warn('[Email] Email service will be unavailable — app will continue running');
         // Don't throw — let app continue even if email fails
         transporter = null;
