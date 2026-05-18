@@ -4,6 +4,8 @@ import { generateInsights } from './ai.service.js';
 import { generatePDF } from './pdf.service.js';
 import { sendReportEmail, sendFailureEmail } from './email.service.js';
 import { retry, RETRY_CONFIGS } from '../utils/retry.util.js';
+import { updateLeadSheetStatus } from './googleSheets.service.js';
+import { uploadPDFToDrive } from './googleDrive.service.js';
 
 /**
  * Orchestrates the full lead enrichment workflow with retry logic.
@@ -13,8 +15,9 @@ import { retry, RETRY_CONFIGS } from '../utils/retry.util.js';
  * All errors are caught and handled gracefully — never crashes the app.
  *
  * @param {string} leadId - MongoDB ObjectId of the saved lead
+ * @param {number} sheetRowNumber - The row number in the Google Sheet where the lead is located
  */
-export const generateLeadWorkflow = async (leadId) => {
+export const generateLeadWorkflow = async (leadId, sheetRowNumber) => {
     let lead;
 
     try {
@@ -27,6 +30,7 @@ export const generateLeadWorkflow = async (leadId) => {
         console.log(`[Workflow] Started → ${lead.name} @ ${lead.companyName}`);
 
         // ── Step 2: Scrape company website (with retry) ─────────────────────
+        await updateLeadSheetStatus(sheetRowNumber, 'Scraping');
         console.log('[Workflow] Step 1/4 — Scraping company website...');
         const scrapeData = await retry(
             () => scrapeCompany(lead.companyWebsite),
@@ -38,6 +42,7 @@ export const generateLeadWorkflow = async (leadId) => {
         console.log('[Scrape] ✓ Completed');
 
         // ── Step 3: Generate AI insights (with retry) ───────────────────────
+        await updateLeadSheetStatus(sheetRowNumber, 'Generating AI insights');
         console.log('[Workflow] Step 2/4 — Generating AI insights...');
         const insights = await retry(
             () => generateInsights(lead.toObject(), scrapeData),
@@ -49,11 +54,18 @@ export const generateLeadWorkflow = async (leadId) => {
         console.log('[AI] ✓ Insights generated');
 
         // ── Step 4: Generate PDF buffer in-memory (no retries) ──────────────
+        await updateLeadSheetStatus(sheetRowNumber, 'Generating PDF');
         console.log('[Workflow] Step 3/4 — Generating PDF report...');
         const pdfBuffer = await generatePDF(lead.toObject(), insights);
         console.log(`[PDF] ✓ Generated (${pdfBuffer.length} bytes)`);
+        await updateLeadSheetStatus(sheetRowNumber,'Uploading PDF to Drive');
+
+        const driveLink = await uploadPDFToDrive( pdfBuffer,`${lead.companyName}_audit.pdf`);
+
+        console.log('[Drive] ✓ Uploaded');
 
         // ── Step 5: Send email with PDF attachment (with retry) ────────────
+        await updateLeadSheetStatus(sheetRowNumber, 'Sending email',driveLink);
         console.log('[Workflow] Step 4/4 — Sending report email...');
         await retry(
             () => sendReportEmail(lead.toObject(), pdfBuffer),
@@ -65,6 +77,7 @@ export const generateLeadWorkflow = async (leadId) => {
         console.log('[Email] ✓ Sent');
 
         // ── Step 6: Mark as completed ───────────────────────────────────────
+        await updateLeadSheetStatus(sheetRowNumber, 'Completed',);
         lead.status = 'completed';
         lead.completedAt = new Date();
         await lead.save();
@@ -73,6 +86,7 @@ export const generateLeadWorkflow = async (leadId) => {
 
     } catch (error) {
         // ── Workflow failed after retries ───────────────────────────────────
+        await updateLeadSheetStatus(sheetRowNumber, 'Failed', '', error.message);
         console.error(`[Workflow] ✗ Failed for leadId ${leadId}:`, error.message);
 
         if (!lead) {
