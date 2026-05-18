@@ -1,3 +1,19 @@
+# Dependency folders (No need to upload thousands of npm packages)
+backend/node_modules/
+frontend/node_modules/
+
+# Local Environment Variables (Contains sensitive API keys)
 backend/.env
-backend/config/google-service-account.json
 frontend/.env
+
+# Google Service Account Credentials (CRITICAL SECURITY)
+backend/config/google-service-account.json
+backend/config/*.json
+
+# Production builds (Vercel/Render handle builds on their own)
+frontend/dist/
+frontend/build/
+
+# System files
+.DS_Store
+Thumbs.db
