@@ -1,0 +1,227 @@
+# Architecture Decisions & Engineering Notes
+
+## Final Folder Structure
+
+```
+backend/
+├── app.js                      # Server entry point, DB bootstrap
+├── .env.example                # Environment variable template
+├── reports/                    # Auto-created — generated PDFs land here
+│
+├── config/
+│   └── db.js                   # MongoDB connection setup
+│
+├── models/
+│   └── lead.model.js           # Lead schema + workflow state
+│
+├── routes/
+│   └── lead.routes.js          # POST /api/leads → controller
+│
+├── controllers/
+│   └── lead.controller.js      # Validates, saves, responds, fires workflow
+│
+└── services/
+    ├── workflow.service.js     # Orchestration-only layer
+    ├── scrape.service.js       # axios + cheerio website scraper
+    ├── ai.service.js           # OpenAI structured insights
+    ├── pdf.service.js          # Puppeteer HTML → PDF
+    └── email.service.js        # Nodemailer PDF delivery
+```
+
+---
+
+## Request → Response Flow
+
+```
+Frontend (React)
+     │  POST /api/leads
+     ▼
+lead.controller.js
+     │  1. Joi validation
+     │  2. Lead.create() — persists with status: "processing"
+     │  3. res.status(200).json(leadId) ← IMMEDIATE response here
+     │  4. generateLeadWorkflow(id).catch(...)  ← fire-and-forget
+     ▼
+workflow.service.js               ← runs independently, never blocks request
+     │  Step 1: scrape.service.js
+     │  Step 2: ai.service.js
+     │  Step 3: pdf.service.js
+     │  Step 4: email.service.js
+     │  Step 5: Lead.status = "completed"
+     ▼
+MongoDB (status tracking)
+```
+
+---
+
+## Architectural Decisions
+
+### Why Node.js + Express?
+
+**Chosen because:** Node.js event loop is ideal for I/O-heavy workflows. This system
+performs multiple async operations (HTTP scraping, OpenAI API, Puppeteer, email SMTP)
+that would block a thread-per-request server like traditional Java/PHP frameworks.
+
+**Tradeoff:** CPU-heavy tasks (like PDF rendering via Puppeteer) temporarily occupy the
+event loop. For scale, Puppeteer should run in a separate worker process.
+
+**Production upgrade:** Offload Puppeteer to a dedicated microservice or use
+`worker_threads` for isolation.
+
+---
+
+### Why MongoDB Atlas?
+
+**Chosen because:**
+- Cloud-hosted → zero infrastructure management
+- Pairs with Render/Vercel/Railway for instant deployment
+- Flexible document schema — lead payloads can evolve without migrations
+- Built-in status tracking (`processing → completed → failed`) is trivial with a field
+
+**Tradeoff:** NoSQL means no relational joins. Fine here — all workflow state lives
+on one document.
+
+**Production upgrade:** Add indexes on `email`, `status`, `createdAt` for query performance.
+
+---
+
+### Why `workflow.service.js` exists as a separate layer?
+
+**Chosen because:** The controller's job is to handle HTTP. The workflow's job is to
+coordinate services. Mixing them creates a god function that's hard to test, debug, and modify.
+
+This layer only knows:
+1. What order to call services
+2. What to pass between them
+3. What to do if something fails
+
+It does NOT implement scraping, AI, PDF, or email logic.
+
+**Benefit:** You can swap out any service (e.g., replace Puppeteer with WeasyPrint)
+without touching the orchestration logic.
+
+---
+
+### Why are services separated by responsibility?
+
+**Single Responsibility Principle** — each file does exactly one thing:
+
+| Service | Responsibility |
+|---|---|
+| `scrape.service.js` | Fetch + parse website HTML |
+| `ai.service.js` | Generate structured insights via GPT-4o |
+| `pdf.service.js` | Render HTML → PDF file |
+| `email.service.js` | Deliver PDF via SMTP |
+| `workflow.service.js` | Coordinate the above in order |
+
+**Benefit:** Each service is independently testable. You can unit test AI output
+without spinning up Puppeteer.
+
+---
+
+### Why sequential `await` instead of `Promise.all`?
+
+**Chosen because:** Each step depends on the output of the previous:
+- AI needs scrape data → can't run in parallel
+- PDF needs AI insights → can't run in parallel
+- Email needs PDF path → can't run in parallel
+
+`Promise.all` is only appropriate for truly independent operations (e.g., fetching
+from two different APIs simultaneously).
+
+**Production upgrade:** If future steps become independent (e.g., storing raw data
+while generating insights), those can be parallelized selectively.
+
+---
+
+### Why no queues (BullMQ/Redis) yet?
+
+**Chosen because:** For an assignment prototype, queues add significant operational
+overhead (Redis server, queue admin, retry config, dead letter queues) without
+meaningful benefit at single-user scale.
+
+The current `fire-and-forget` pattern with `.catch()` is sufficient for:
+- Single workflow per request
+- No retry requirements yet
+- No distributed processing needed
+
+**Future upgrade path (when to add BullMQ):**
+- Handling 100+ concurrent leads
+- Need for retry logic on failures
+- Need for priority queuing
+- Distributed workers across multiple servers
+- Need visibility into queue state (dashboard)
+
+```js
+// Future BullMQ integration would look like:
+await leadQueue.add('process-lead', { leadId: lead._id });
+// Worker picks this up independently
+```
+
+---
+
+### Why send HTTP response before workflow runs?
+
+**Chosen because:** The workflow takes 10-60 seconds (scraping, AI, PDF, email).
+Making the user wait would be catastrophic UX and would time out on most platforms.
+
+The `res.json()` call happens before `generateLeadWorkflow()` is invoked. The workflow
+runs entirely within Node's event loop after the response is flushed.
+
+**Engineering note:** Node.js does not terminate after `res.send()`. The process stays
+alive for the event loop. This is exactly what makes fire-and-forget safe here.
+
+---
+
+### How failures are handled
+
+```
+workflow.service.js
+  ├── try { all steps }
+  └── catch (error)
+        ├── log error to console
+        └── lead.status = "failed"
+            lead.errorMessage = error.message
+            lead.save()
+```
+
+**Each service also has its own fallback:**
+- `scrape.service.js` — returns empty data on timeout/block (non-fatal)
+- `ai.service.js` — returns a fallback JSON object if OpenAI fails
+- `pdf.service.js` — throws (fatal — no PDF = no email)
+- `email.service.js` — throws (fatal — failure marks lead as failed)
+
+**Design decision:** Scraping and AI failures are non-fatal (the workflow continues
+with degraded data). PDF and email failures are fatal (the report cannot be delivered).
+
+---
+
+## Required Environment Variables
+
+Copy `.env.example` → `.env` and fill in:
+
+```bash
+PORT=5000
+MONGODB_URI=mongodb+srv://...
+OPENAI_API_KEY=sk-...
+EMAIL_USER=your@gmail.com
+EMAIL_PASS=xxxx xxxx xxxx xxxx   # Gmail App Password
+```
+
+> **Gmail App Password**: Go to myaccount.google.com/apppasswords
+> Enable 2FA first, then generate a 16-character app password.
+
+---
+
+## Future Production Improvements
+
+| Area | Current | Production |
+|---|---|---|
+| Job Queue | Fire-and-forget | BullMQ + Redis |
+| PDF Storage | Local filesystem | AWS S3 / Cloudflare R2 |
+| AI Failures | Fallback JSON | Retry with exponential backoff |
+| Scraping | Single cheerio pass | Puppeteer for JS-rendered sites |
+| Monitoring | console.log | Winston + Datadog/Sentry |
+| Email | Nodemailer/Gmail | SendGrid / Postmark |
+| Workers | Same Node process | Separate worker service |
+| Rate Limiting | None | express-rate-limit on /api |
